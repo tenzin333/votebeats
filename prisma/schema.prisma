@@ -1,0 +1,68 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id       String   @id @default(uuid())
+  email    String   @unique
+  provider Provider @default(Google)
+  role     Role     @default(EndUser)
+  streams  Stream[]
+  upvotes  Upvote[]
+}
+
+model Stream {
+  id          String     @id @default(uuid())
+  type        StreamType
+  url         String
+  extractedId String
+  active      Boolean    @default(true)
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  upvotes     Upvote[]
+  title       String
+  smallImg    String
+  bigImg      String
+  addedBy     String
+  currentStream CurrentStream?
+  played      Boolean     @default(false)
+  playedTs    DateTime?          
+  createdAt   DateTime    @default(now())
+}
+
+
+model CurrentStream {
+  userId    String  @id
+  streamId  String? @unique
+  stream    Stream? @relation(fields:[streamId], references:[id])
+}
+
+model Upvote {
+  id       String @id @default(uuid())
+  userId   String
+  streamId String
+  stream   Stream @relation(fields: [streamId], references: [id], onDelete: Cascade)
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, streamId])
+}
+
+enum Role {
+  Streamer
+  EndUser
+}
+
+enum Provider {
+  Google
+}
+
+enum StreamType {
+  Youtube
+  Spotify
+}
