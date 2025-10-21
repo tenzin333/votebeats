@@ -1,32 +1,36 @@
 "use client"
 
-import { Music, Zap, Shield } from "lucide-react"
+import { ThumbsUp, Users, Music } from "lucide-react"
 
 const features = [
   {
+    icon: ThumbsUp,
+    title: "Real-Time Voting",
+    description: "Upvote or downvote songs as they play. The community decides what's next.",
+  },
+  {
+    icon: Users,
+    title: "Collaborative Queue",
+    description: "Add songs to the shared queue and watch the playlist evolve together.",
+  },
+  {
     icon: Music,
-    title: "Curated Collections",
-    description: "Hand-picked playlists organized by mood and genre for your streams.",
-  },
-  {
-    icon: Zap,
-    title: "Instant Integration",
-    description: "One-click setup with your streaming software. Start playing immediately.",
-  },
-  {
-    icon: Shield,
-    title: "Royalty-Free",
-    description: "All music is 100% royalty-free. Stream with confidence.",
+    title: "Live Streaming",
+    description: "Stream YouTube music seamlessly with instant playback and smooth transitions.",
   },
 ]
 
-export  function Features() {
+export function Features() {
   return (
     <section id="features" className="py-16 px-4 sm:px-6 lg:px-8 bg-card/30">
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold text-foreground mb-4 text-balance">Everything You Need</h2>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">Powerful features for creators</p>
+          <h2 className="text-4xl font-bold text-foreground mb-4 text-balance">
+            Music Democracy in Action
+          </h2>
+          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+            Powerful features for collaborative listening
+          </p>
         </div>
 
         <div className="grid md:grid-cols-3 gap-6">

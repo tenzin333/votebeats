@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { ArrowRight } from "lucide-react"
+import Link from "next/link"
 
 export function Hero() {
   return (
@@ -15,16 +16,18 @@ export function Hero() {
       <div className="max-w-7xl mx-auto relative z-10">
         <div className="text-center">
           <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-foreground mb-6 text-balance">
-            Music for <span className="text-primary">Creators</span>
+            Let Your Voice <span className="text-primary">Shape the Music</span>
           </h1>
 
           <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-8 text-balance">
-            Discover and stream royalty-free music designed for your streams.
+            Stream together, vote in real-time, and create the perfect playlist as a community.
           </p>
+          <Link href='/login'>
+            <Button size="lg" className="bg-primary hover:bg-violet-300 text-primary-foreground gap-2">
+              Start Listening <ArrowRight className="w-4 h-4" />
+            </Button>
+          </Link>
 
-          <Button size="lg" className="bg-primary hover:bg-violet-300 text-primary-foreground gap-2">
-            Start Exploring <ArrowRight className="w-4 h-4" />
-          </Button>
         </div>
       </div>
     </section>

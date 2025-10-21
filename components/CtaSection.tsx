@@ -2,8 +2,9 @@
 
 import { Button } from "@/components/ui/button"
 import { ArrowRight } from "lucide-react"
+import Link from "next/link";
 
-export function CTASection() {
+export  function CTASection() {
   return (
     <section className="py-20 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto">
@@ -13,12 +14,18 @@ export function CTASection() {
             Sign in to start upvoting songs and adding music to help creators find their perfect soundtrack.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" className="bg-primary hover:bg-accent text-primary-foreground gap-2">
-              Sign In Now <ArrowRight className="w-4 h-4" />
-            </Button>
-            <Button size="lg" variant="outline" className="border-border hover:bg-card bg-transparent">
+            <Link href="/login">
+              <Button size="lg" className="bg-primary hover:bg-accent text-primary-foreground gap-2" >
+                Sign In Now <ArrowRight className="w-4 h-4" />
+              </Button>
+            </Link>
+
+            <Link href="/login">
+              <Button size="lg" variant="outline" className="border-border hover:bg-card bg-transparent">
               Create Account
             </Button>
+            </Link>
+          
           </div>
         </div>
       </div>

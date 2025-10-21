@@ -3,33 +3,136 @@
 import { Clock, Music, SkipForward, ThumbsUp } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
-import { useEffect, useState, useRef } from "react";
-import axios from "axios";
+import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { Button } from "./ui/button";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import axios from "axios";
+import { toast } from "sonner";
 
-interface CurrentPlayingProps {
-  currentStream: any;
-  playVideo: boolean;
-  setCurrentStream: any;
+// Types
+interface Stream {
+  id: string;
+  extractedId?: string;
+  title?: string;
+  type?: string;
+  upvotes?: number;
+  votes?: number;
+  _count?: { upvotes?: number };
+  addedBy?: string;
+  duration?: string;
 }
 
-export default function CurrentPlaying({
-  currentStream,
-  playVideo,
-  setCurrentStream,
-}: CurrentPlayingProps) {
+interface CurrentPlayingProps {
+  creatorId?: string;
+}
+
+export default function CurrentPlaying({ creatorId }: CurrentPlayingProps) {
   const [progress, setProgress] = useState(0);
   const [playNextLoader, setPlayNextLoader] = useState<boolean>(false);
   const { data: session } = useSession();
-  const playerRef = useRef<any>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const playerRef = useRef<any | null>(null);
+  const [currentStream, setCurrentStream] = useState<Stream | null>(null);
+  const [playVideo, setPlayVideo] = useState<boolean>(false);
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Memoized user ID
+  const userId = useMemo(() => 
+    creatorId || session?.user?.id, 
+    [creatorId, session?.user?.id]
+  );
+
+  // Fetch initial stream
+  const fetchStream = useCallback(async () => {
+    if (!userId) return;
+
+    setIsLoading(true);
+
+    try {
+      const res = await axios.get(`/api/streams?creatorId=${userId}`);
+      const activeStream = res.data.activeStream?.stream || null;
+      setCurrentStream(activeStream);
+      setPlayVideo(true);
+    } catch (error) {
+      console.error("Error fetching stream:", error);
+      toast.error("Error while fetching stream");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [userId]);
+
+  // Initial fetch
+  useEffect(() => {
+    fetchStream();
+  }, [fetchStream]);
+
+  // Fetch most upvoted stream
+  const fetchMostUpvotedStream = useCallback(async () => {
+    try {
+      setPlayNextLoader(true);
+      const res = await axios.get("/api/streams/next");
+      console.log("Next stream:", res.data.stream);
+      setCurrentStream(res.data.stream);
+    } catch (err) {
+      console.error("Error fetching next stream:", err);
+      toast.error("Failed to load next song");
+    } finally {
+      setPlayNextLoader(false);
+    }
+  }, []);
+
+  // Handle when stream ends
+  const handleStreamNext = useCallback(() => {
+    fetchMostUpvotedStream();
+  }, [fetchMostUpvotedStream]);
+
+  // Progress tracking
+  const updateProgress = useCallback(() => {
+    if (playerRef.current && typeof playerRef.current.getCurrentTime === 'function') {
+      const currentTime = playerRef.current.getCurrentTime();
+      const duration = playerRef.current.getDuration();
+      
+      if (duration > 0) {
+        const calculatedProgress = (currentTime / duration) * 100;
+        setProgress(calculatedProgress);
+      }
+    }
+  }, []);
+
+  // Start/stop progress tracking
+  useEffect(() => {
+    if (currentStream?.extractedId && playerRef.current) {
+      // Start progress interval
+      progressIntervalRef.current = setInterval(updateProgress, 1000);
+    } else {
+      // Clear progress interval
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+      setProgress(0);
+    }
+
+    return () => {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+    };
+  }, [currentStream?.extractedId, updateProgress]);
 
   // Load YouTube IFrame API and handle video changes
   useEffect(() => {
     if (!currentStream?.extractedId) return;
 
-    function createPlayer() {
+    const createPlayer = () => {
+      // Destroy existing player if it exists
+      if (playerRef.current) {
+        playerRef.current.destroy();
+        playerRef.current = null;
+      }
+
       playerRef.current = new (window as any).YT.Player("youtube-player", {
         videoId: currentStream.extractedId,
         events: {
@@ -38,18 +141,29 @@ export default function CurrentPlaying({
               handleStreamNext();
             }
           },
+          onReady: () => {
+            console.log("YouTube player ready");
+          },
+          onError: (event: any) => {
+            console.error("YouTube player error:", event.data);
+            toast.error("Failed to load video");
+          },
         },
         playerVars: {
           autoplay: 1,
           modestbranding: 1,
+          rel: 0,
         },
       });
-    }
+    };
 
     if (!(window as any).YT) {
+      // Load YouTube IFrame API
       const tag = document.createElement("script");
       tag.src = "https://www.youtube.com/iframe_api";
-      document.body.appendChild(tag);
+      const firstScriptTag = document.getElementsByTagName("script")[0];
+      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+      
       (window as any).onYouTubeIframeAPIReady = createPlayer;
     } else {
       if (!playerRef.current) {
@@ -59,24 +173,36 @@ export default function CurrentPlaying({
         playerRef.current.loadVideoById(currentStream.extractedId);
       }
     }
-  }, [currentStream]);
 
-  const fetchMostUpvotedStream = async () => {
-    try {
-      setPlayNextLoader(true);
-      const res = await axios.get("/api/streams/next");
-      console.log(res.data.stream);
-      setCurrentStream(res.data.stream);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setPlayNextLoader(false);
-    }
-  };
+    // Cleanup on unmount
+    return () => {
+      if (playerRef.current) {
+        playerRef.current.destroy();
+        playerRef.current = null;
+      }
+    };
+  }, [currentStream?.extractedId, handleStreamNext]);
 
-  const handleStreamNext = () => {
-    fetchMostUpvotedStream();
-  };
+  // Loading state
+  if (isLoading) {
+    return (
+      <Card className="border-border/50 bg-card/50 backdrop-blur-xl overflow-hidden shadow-xl max-w-full">
+        <CardContent className="p-0">
+          <div className="relative">
+            <div className="h-[400px] w-full aspect-video bg-gradient-to-br from-secondary to-background relative overflow-hidden flex items-center justify-center">
+              <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent"></div>
+              <div className="relative z-10 text-center">
+                <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-secondary/50 flex items-center justify-center animate-pulse">
+                  <Music className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <p className="text-sm text-muted-foreground">Loading...</p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   // Fallback UI when no song is playing
   if (!currentStream) {
@@ -90,10 +216,6 @@ export default function CurrentPlaying({
                 <div className="w-16 h-16 mx-auto mb-3 rounded-full bg-secondary/50 flex items-center justify-center">
                   <Music className="w-8 h-8 text-muted-foreground" />
                 </div>
-              </div>
-            </div>
-            <div className="p-3">
-              <div className="text-center py-4">
                 <h2 className="text-base font-bold mb-1 text-muted-foreground">
                   No song playing
                 </h2>
@@ -104,9 +226,13 @@ export default function CurrentPlaying({
             </div>
             {playVideo && (
               <div className="py-3 px-4">
-                <Button className="ghost" onClick={handleStreamNext}>
-                  <SkipForward className="w-4 h-4" />
-                  Play Next
+                <Button 
+                  variant="ghost" 
+                  onClick={handleStreamNext}
+                  disabled={playNextLoader}
+                >
+                  <SkipForward className="w-4 h-4 mr-2" />
+                  {playNextLoader ? "Loading..." : "Play Next"}
                 </Button>
               </div>
             )}
@@ -116,10 +242,17 @@ export default function CurrentPlaying({
     );
   }
 
+  // Get vote count
+  const voteCount = currentStream.upvotes || 
+                    currentStream.votes || 
+                    currentStream._count?.upvotes || 
+                    0;
+
   return (
     <Card className="border-border/50 bg-card/50 backdrop-blur-xl overflow-hidden shadow-xl max-w-full">
       <CardContent className="p-0">
         <div className="relative">
+          {/* Video Container */}
           <div className="h-[400px] w-full aspect-video bg-gradient-to-br from-secondary to-background relative overflow-hidden">
             {currentStream.extractedId ? (
               <div className="w-full h-full">
@@ -131,6 +264,7 @@ export default function CurrentPlaying({
               </div>
             )}
 
+            {/* Progress bar overlay */}
             {progress > 0 && (
               <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-700/50">
                 <div
@@ -141,35 +275,34 @@ export default function CurrentPlaying({
             )}
           </div>
 
-          <div className="p-3">
-            <div className="flex items-start justify-between mb-2">
-              <div className="flex-1 min-w-0 mr-2">
-                <h2 className="text-base font-bold mb-0.5 truncate">
+          {/* Song Info */}
+          <div className="p-4">
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex-1 min-w-0 mr-3">
+                <h2 className="text-lg font-bold mb-1 truncate">
                   {currentStream.title || "Unknown Title"}
                 </h2>
-                <p className="text-muted-foreground text-xs truncate">
+                <p className="text-muted-foreground text-sm truncate">
                   {currentStream.type || "YouTube"}
                 </p>
               </div>
-              <div className="flex flex-col items-center gap-0.5 bg-secondary/50 px-4 py-1.5 rounded-md border border-border shrink-0">
-                <div className="flex items-center gap-3">
+              <div className="flex flex-col items-center gap-1 bg-secondary/50 px-4 py-2 rounded-lg border border-border shrink-0">
+                <div className="flex items-center gap-2">
                   <ThumbsUp className="w-4 h-4 text-primary" />
-                  <span className="text-base font-bold">
-                    {currentStream.upvotes ||
-                      currentStream.votes ||
-                      currentStream._count?.upvotes ||
-                      0}
-                  </span>
+                  <span className="text-lg font-bold">{voteCount}</span>
                 </div>
-                <span className="text-[9px] text-muted-foreground">votes</span>
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wide">
+                  votes
+                </span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 text-[10px] text-muted-foreground mb-2">
-              <div className="flex items-center gap-1">
-                <Avatar className="w-4 h-4">
-                  <AvatarFallback className="bg-primary/20 text-primary text-[8px]">
-                    {currentStream.addedBy?.charAt(0) || "U"}
+            {/* Added By & Duration */}
+            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
+              <div className="flex items-center gap-1.5">
+                <Avatar className="w-5 h-5">
+                  <AvatarFallback className="bg-primary/20 text-primary text-[10px]">
+                    {currentStream.addedBy?.charAt(0).toUpperCase() || "U"}
                   </AvatarFallback>
                 </Avatar>
                 <span>{currentStream.addedBy || "Unknown"}</span>
@@ -177,55 +310,56 @@ export default function CurrentPlaying({
               {currentStream.duration && (
                 <>
                   <span className="text-muted-foreground/50">•</span>
-                  <div className="flex items-center gap-0.5">
-                    <Clock className="w-2.5 h-2.5" />
+                  <div className="flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
                     <span>{currentStream.duration}</span>
                   </div>
                 </>
               )}
             </div>
 
+            {/* Progress Bar */}
             {progress > 0 && (
-              <div className="mb-2">
-                <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
+              <div className="mb-3">
+                <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
                   <span>Progress</span>
                   <span>{Math.round(progress)}%</span>
                 </div>
-                <div className="w-full bg-secondary/50 rounded-full h-1.5">
+                <div className="w-full bg-secondary/50 rounded-full h-2">
                   <div
-                    className="bg-primary h-1.5 rounded-full transition-all"
+                    className="bg-primary h-2 rounded-full transition-all duration-300"
                     style={{ width: `${progress}%` }}
                   />
                 </div>
               </div>
             )}
 
-            <div className="flex items-center justify-between text-[10px]">
-              <span className="text-muted-foreground">Click to play video</span>
+            {/* Actions */}
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex-1">
+                {playVideo && (
+                  <Button
+                    variant="default"
+                    onClick={handleStreamNext}
+                    disabled={playNextLoader}
+                    className="w-full"
+                  >
+                    <SkipForward className="w-4 h-4 mr-2" />
+                    {playNextLoader ? "Loading..." : "Play Next"}
+                  </Button>
+                )}
+              </div>
               {currentStream.extractedId && (
                 <Link
-                  href={`https://www.youtube.com/watch?v=${currentStream.extractedId}?autoplay=1`}
+                  href={`https://www.youtube.com/watch?v=${currentStream.extractedId}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-primary hover:underline"
+                  className="text-xs text-primary hover:underline whitespace-nowrap"
                 >
-                  Watch on YouTube
+                  Watch on YouTube →
                 </Link>
               )}
             </div>
-
-            {playVideo && (
-              <div className="py-3">
-                <Button
-                  className="ghost"
-                  onClick={handleStreamNext}
-                  disabled={playNextLoader}
-                >
-                  <SkipForward className="w-4 h-4" />
-                  {playNextLoader ? "Loading..." : "Play Next"}
-                </Button>
-              </div>
-            )}
           </div>
         </div>
       </CardContent>

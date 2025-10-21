@@ -1,12 +1,15 @@
 "use client";
 
-import { LogIn, LogOut, Music } from "lucide-react"
+import { LogIn, LogOut, Music, Router } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { signIn, signOut, useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function Appbar() {
   const { data: session } = useSession();
+  const router = useRouter();
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
   useEffect(() => {
     if (session?.user) {
@@ -21,7 +24,7 @@ export default function Appbar() {
       <div className="max-w-full mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 curson-pointer">
             <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
               <Music className="w-5 h-5 text-primary-foreground" />
             </div>
@@ -31,35 +34,21 @@ export default function Appbar() {
           {/* User Menu */}
           <div className="flex items-center gap-3">
             {isLoggedIn ? (
-              // <DropdownMenu>
-              //   <DropdownMenuTrigger asChild>
-              //     <Button variant="ghost" size="icon" className="rounded-full">
-              //       <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-              //         <User className="w-4 h-4 text-primary" />
-              //       </div>
-              //     </Button>
-              //   </DropdownMenuTrigger>
-              //   <DropdownMenuContent align="end" className="w-48">
-              //     <DropdownMenuItem>
-              //       <User className="w-4 h-4 mr-2" />
-              //       Profile
-              //     </DropdownMenuItem>
-              //     {/* <DropdownMenuItem>My Rooms</DropdownMenuItem> */}
-              //     <DropdownMenuSeparator />
-              //     <DropdownMenuItem className="text-destructive" onClick={() => signOut()}>
-              //       Log out
-              //     </DropdownMenuItem>
-              //   </DropdownMenuContent>
-              // </DropdownMenu>
-               <Button variant="ghost" size="sm" onClick={() => signOut()}>
-                <LogOut className="w-4 h-4 mr-2" />
-                Logout
-              </Button>
+              <Link href="/login">
+                <Button variant="ghost" size="sm" onClick={() => signOut()}>
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Logout
+                </Button>
+              </Link>
+
             ) : (
-              <Button variant="ghost" size="sm" onClick={() => signIn()}>
-                <LogIn className="w-4 h-4 mr-2" />
-                Login
-              </Button>
+              <Link href="/login">
+                <Button variant="ghost" size="sm" >
+                  <LogIn className="w-4 h-4 mr-2" />
+                  Login
+                </Button>
+              </Link>
+
             )}
           </div>
         </div>

@@ -7,12 +7,16 @@ declare module "next-auth" {
       email?: string | null;
       name?: string | null;
       image?: string | null;
+      role: "Streamer" | "EndUser";
+    } &
+      DefaultSession["user"];
     };
-  }
 }
+
 
 declare module "next-auth/jwt" {
   interface JWT {
     id?: string;
+    role: "Streamer" | "EndUser";
   }
 }

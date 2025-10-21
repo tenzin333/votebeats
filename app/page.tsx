@@ -8,8 +8,6 @@ import { CTASection } from "@/components/CtaSection";
 import StreamView from "@/components/StreamView";
 import { authOptions } from "./api/auth/[...nextauth]/route";
 
-const creatorId = "110329981896795318120";
-
 export default async function Home() {
   const session = await getServerSession(authOptions);
 
@@ -31,7 +29,7 @@ export default async function Home() {
   return (
     <div className='flex flex-col px-4 gap-3'>
       <Appbar />
-      <StreamView creatorId={creatorId}  playVideo={true} />
+      <StreamView   playVideo={true} />
       <Footer />
     </div>
   );

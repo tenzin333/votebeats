@@ -1,51 +1,62 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import axios from "axios";
 import { useSession } from "next-auth/react";
 import { toast } from 'sonner';
 import CurrentPlaying from "./CurrentPlayer";
 import Queue from './Queue';
-import {  Share2 } from 'lucide-react';
+import { Share2 } from 'lucide-react';
 import { Button } from './ui/button';
-
-// const REFRESH_INTERVAL = 10 * 1000;
 
 interface Stream {
     id: string;
     upvotes: number;
-    // Add other stream properties here
+    userId: string;
+    url: string;
+    extractedId: string;
+    type: string;
+    title: string;
+    smallImg: string;
+    bigImg: string;
+    played: boolean;
+    playedTs?: Date;
+    createAt: Date;
+}
+
+interface ActiveStream {
+    stream: Stream | null;
 }
 
 interface StreamViewProps {
-    creatorId: string;
-    playVideo:boolean
-
+    creatorId?: string;
+    playVideo: boolean;
 }
 
 export default function StreamView({ 
     creatorId,
-    playVideo=false
- }: StreamViewProps) {
+    playVideo = false
+}: StreamViewProps) {
     const [streams, setStreams] = useState<Stream[]>([]);
-    const [currentStream , setCurrentStream] = useState<any>();
+    const [currentStream, setCurrentStream] = useState<Stream | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const { data: session } = useSession();
-    const abortControllerRef = useRef<AbortController | null>(null);
 
     const refreshStream = useCallback(async () => {
         const userId = creatorId || session?.user?.id;
         if (!userId) return;
+        
         setIsLoading(true);
 
         try {
             const res = await axios.get(`/api/streams?creatorId=${userId}`);
 
-            const sortedStreams = [...res.data.streams].sort((a, b) => {
-                return (b.upvotes || 0) - (a.upvotes || 0);
-            });
+            const sortedStreams = [...res.data.streams].sort((a: Stream, b: Stream) => 
+                (b.upvotes || 0) - (a.upvotes || 0)
+            );
+            
             setStreams(sortedStreams);
-            setCurrentStream(res.data.activeStream.stream);
+            setCurrentStream(res.data.activeStream?.stream || null);
         } catch (err) {
             toast.error("Failed to load streams");
             console.error(err);
@@ -55,23 +66,10 @@ export default function StreamView({
     }, [creatorId, session?.user?.id]);
 
     useEffect(() => {
-        if (!creatorId && !session?.user?.id) {
-            console.log("Waiting for session...");
-            return;
-        }
-
+        if (!creatorId && !session?.user?.id) return;
+        
         refreshStream();
-        // const interval = setInterval(refreshStream, REFRESH_INTERVAL);
-
-        // return () => {
-        //     clearInterval(interval);
-        //     // Cancel any pending requests on unmount
-        //     if (abortControllerRef.current) {
-        //         abortControllerRef.current.abort();
-        //     }
-        // };
-    }, []);
-
+    }, [creatorId, session?.user?.id, refreshStream]);
 
     const handleShareLink = async () => {
         const userId = creatorId || session?.user?.id;
@@ -121,25 +119,16 @@ export default function StreamView({
                 <Button 
                     size="icon"
                     variant="outline"
-                    className='hover:bg-blue-500 hover:text-white hover:bg-black transition-colors' 
+                    className='hover:bg-blue-500 hover:text-white transition-colors' 
                     onClick={handleShareLink}
                     aria-label="Share stream link"
                 >
-                    <Share2  className="h-4 w-4" />
+                    <Share2 className="h-4 w-4" />
                 </Button>
             </div>
 
-            <CurrentPlaying currentStream={currentStream} 
-             playVideo={playVideo}
-             setCurrentStream={setCurrentStream}
-            />
-            <Queue 
-                streams={streams} 
-                refreshStream={refreshStream} 
-                setStreams={setStreams}
-                creatorId={creatorId}
-                isLoading={isLoading}
-            />
+            <CurrentPlaying creatorId={creatorId || session?.user?.id} />
+            <Queue creatorId={creatorId || session?.user?.id} />
         </div>
     );
 }
